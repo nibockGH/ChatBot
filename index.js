@@ -21,7 +21,7 @@ const APPOINTMENT_DURATION = 30;
 // --- Configuración de Twilio (Leídos desde Variables de Entorno) ---
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886'; // Este no es un secreto, puede quedar
+const TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886';
 const DOCTOR_WHATSAPP_NUMBER = process.env.DOCTOR_WHATSAPP_NUMBER;
 
 const twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
@@ -152,21 +152,27 @@ app.post('/webhook', async (req, res) => {
     console.log(`\n>>> INTENT RECIBIDO: ${intentName}`);
 
     if (intentName === 'Solicitar_Turno') {
-      const parameters = req.body.queryResult.parameters;
-      const requestedDate = parameters.turn_date;
-      const timePreference = parameters.time_preference;
-      if (!requestedDate || !timePreference) {
-        return res.json({ fulfillmentText: 'Me perdí. ¿Para qué día y horario (mañana/tarde) querías el turno?' });
-      }
-      const formattedDate = new Date(requestedDate).toISOString().split('T')[0];
-      const availableTimes = await findFreeSlots(formattedDate, APPOINTMENT_DURATION, timePreference);
-      if (availableTimes.length > 0) {
-        res.json({ fulfillmentText: `¡Genial! Por la ${timePreference} del ${formattedDate} encontré estos horarios: ${availableTimes.join(', ')}. ¿Cuál te agendo?` });
-      } else {
-        res.json({ fulfillmentText: `Lo siento, no encontré ningún horario libre para la ${timePreference} del ${formattedDate}. ¿Querés probar otro día?` });
-      }
+      // ---- CAMBIO IMPORTANTE ----
+      // Ahora, este intent solo hace la pregunta sobre ortodoncia.
+      const response = {
+        fulfillmentText: '¡Claro! Para darte el turno correcto, primero decime, ¿la consulta es para Ortodoncia u Ortopedia?',
+        // Este formato de "fulfillmentMessages" es opcional pero ayuda a mostrar botones
+        // en algunas plataformas como el propio chat de Dialogflow.
+        fulfillmentMessages: [
+          {
+            "platform": "ACTIONS_ON_GOOGLE", // Plataforma genérica que suele funcionar
+            "suggestions": {
+              "suggestions": [
+                { "title": "Sí, para ortodoncia" },
+                { "title": "No, es para otra cosa" }
+              ]
+            }
+          }
+        ]
+      };
+      return res.json(response);
     } 
-    else if (intentName === 'Solicitar_Turno - select_time') {
+    else if (intentName === 'Solicitar_Turno - select_time') { // Dejamos esta lógica por si la reutilizamos
       try {
         if (!req.body.queryResult.outputContexts || req.body.queryResult.outputContexts.length === 0) {
           return res.json({ fulfillmentText: 'Me perdí en la conversación, ¿podríamos empezar de nuevo?' });
